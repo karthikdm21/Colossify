@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ideasAsFounder     Idea[]           @relation("FounderIdeas")
+  accessRequests     AccessRequest[]
+  proposals          Proposal[]       @relation("InvestorProposals")
+  receivedProposals  Proposal[]       @relation("FounderProposals")
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+enum Role {
+  FOUNDER
+  INVESTOR
+}
+
+model Idea {
+  id                String   @id @default(uuid())
+  title             String
+  category          String
+  description       String
+  problemStatement  String
+  solution          String
+  targetMarket      String
+  businessModel     String
+  requestedFunding  Float
+  equityOffered     Float
+  traction          String?
+  published         Boolean  @default(false)
+  
+  // AI Validation
+  aiScore           Float?
+  aiSummary         String?
+  originalityScore  Float?
+  embedding         String?  // JSON array of embeddings
+  
+  founderId         String
+  founder           User     @relation("FounderIdeas", fields: [founderId], references: [id])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  accessRequests    AccessRequest[]
+  proposals         Proposal[]
+  auditLogs         AuditLog[]
+
+  @@map("ideas")
+}
+
+model AccessRequest {
+  id            String            @id @default(uuid())
+  message       String
+  ndaRequired   Boolean           @default(false)
+  status        AccessStatus      @default(PENDING)
+  
+  ideaId        String
+  idea          Idea              @relation(fields: [ideaId], references: [id])
+  
+  investorId    String
+  investor      User              @relation(fields: [investorId], references: [id])
+  
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@map("access_requests")
+}
+
+enum AccessStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  MORE_INFO
+}
+
+model Proposal {
+  id              String          @id @default(uuid())
+  fundingAmount   Float
+  equityOffer     Float
+  milestones      String          // JSON array
+  termSheetNotes  String?
+  status          ProposalStatus  @default(PENDING)
+  
+  ideaId          String
+  idea            Idea            @relation(fields: [ideaId], references: [id])
+  
+  investorId      String
+  investor        User            @relation("InvestorProposals", fields: [investorId], references: [id])
+  
+  founderId       String
+  founder         User            @relation("FounderProposals", fields: [founderId], references: [id])
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@map("proposals")
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  COUNTERED
+  REJECTED
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  relatedId String?
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  actor     String
+  details   String?  // JSON
+  
+  ideaId    String?
+  idea      Idea?    @relation(fields: [ideaId], references: [id])
+  
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

@@ -1,0 +1,306 @@
+{
+    "name": "Colossify - Real-Time Sync",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "sync",
+                "responseMode": "onReceived",
+                "options": {}
+            },
+            "id": "webhook-1",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "webhookId": "startup-sync"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$json[\"event\"]}}",
+                            "operation": "equals",
+                            "value2": "ACCESS_REQUEST_CREATED"
+                        }
+                    ]
+                }
+            },
+            "id": "if-access-request",
+            "name": "Is Access Request?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$json[\"event\"]}}",
+                            "operation": "equals",
+                            "value2": "ACCESS_REQUEST_RESPONDED"
+                        }
+                    ]
+                }
+            },
+            "id": "if-access-response",
+            "name": "Is Access Response?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                450,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$json[\"event\"]}}",
+                            "operation": "equals",
+                            "value2": "NEW_PROPOSAL"
+                        }
+                    ]
+                }
+            },
+            "id": "if-proposal",
+            "name": "Is New Proposal?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                450,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$json[\"event\"]}}",
+                            "operation": "equals",
+                            "value2": "PROPOSAL_COUNTERED"
+                        }
+                    ]
+                }
+            },
+            "id": "if-counter",
+            "name": "Is Counter-Proposal?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                450,
+                900
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "// Notify Founder about new access request\nconst data = items[0].json.data;\n\nreturn [\n  {\n    json: {\n      event: 'NOTIFY_FOUNDER',\n      userId: data.founderId,\n      notification: {\n        type: 'access-request',\n        title: 'New Access Request',\n        message: `${data.investorName} requested access to ${data.ideaTitle}`,\n        relatedId: data.requestId\n      }\n    }\n  }\n];"
+            },
+            "id": "notify-founder-request",
+            "name": "Notify Founder - Request",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                650,
+                250
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "// Notify Investor about access response\nconst data = items[0].json.data;\n\nreturn [\n  {\n    json: {\n      event: 'NOTIFY_INVESTOR',\n      userId: data.investorId,\n      notification: {\n        type: data.status === 'APPROVED' ? 'access-approved' : 'access-rejected',\n        title: data.status === 'APPROVED' ? 'Access Granted' : 'Access Denied',\n        message: `Your access request for ${data.ideaTitle} was ${data.status.toLowerCase()}`,\n        relatedId: data.requestId\n      }\n    }\n  }\n];"
+            },
+            "id": "notify-investor-response",
+            "name": "Notify Investor - Response",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                650,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "// Notify Founder about new proposal\nconst data = items[0].json.data;\n\nreturn [\n  {\n    json: {\n      event: 'NOTIFY_FOUNDER',\n      userId: data.founderId,\n      notification: {\n        type: 'proposal-received',\n        title: 'New Investment Proposal',\n        message: `${data.investorName} sent a proposal for ${data.ideaTitle}: $${data.fundingAmount.toLocaleString()} for ${data.equityOffer}% equity`,\n        relatedId: data.proposalId\n      }\n    }\n  }\n];"
+            },
+            "id": "notify-founder-proposal",
+            "name": "Notify Founder - Proposal",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                650,
+                650
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "// Notify Investor about counter-proposal\nconst data = items[0].json.data;\n\nreturn [\n  {\n    json: {\n      event: 'NOTIFY_INVESTOR',\n      userId: data.investorId,\n      notification: {\n        type: 'proposal-countered',\n        title: 'Counter-Proposal Received',\n        message: `${data.founderName} sent a counter-proposal: $${data.fundingAmount.toLocaleString()} for ${data.equityOffer}% equity`,\n        relatedId: data.proposalId\n      }\n    }\n  }\n];"
+            },
+            "id": "notify-investor-counter",
+            "name": "Notify Investor - Counter",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                650,
+                850
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://api:3001/api/sync/broadcast",
+                "options": {
+                    "bodyParametersUi": {
+                        "parameter": [
+                            {
+                                "name": "event",
+                                "value": "={{$json[\"event\"]}}"
+                            },
+                            {
+                                "name": "userId",
+                                "value": "={{$json[\"userId\"]}}"
+                            },
+                            {
+                                "name": "notification",
+                                "value": "={{$json[\"notification\"]}}"
+                            }
+                        ]
+                    }
+                }
+            },
+            "id": "broadcast-update",
+            "name": "Broadcast to Frontend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "position": [
+                850,
+                550
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Is Access Request?",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Is Access Response?",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Is New Proposal?",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Is Counter-Proposal?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Access Request?": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Founder - Request",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Access Response?": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Investor - Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is New Proposal?": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Founder - Proposal",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is Counter-Proposal?": {
+            "main": [
+                [
+                    {
+                        "node": "Notify Investor - Counter",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notify Founder - Request": {
+            "main": [
+                [
+                    {
+                        "node": "Broadcast to Frontend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notify Investor - Response": {
+            "main": [
+                [
+                    {
+                        "node": "Broadcast to Frontend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notify Founder - Proposal": {
+            "main": [
+                [
+                    {
+                        "node": "Broadcast to Frontend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Notify Investor - Counter": {
+            "main": [
+                [
+                    {
+                        "node": "Broadcast to Frontend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {}
+}
